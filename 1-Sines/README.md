@@ -7,7 +7,7 @@ Calculation of the sum of sines of 10^7 values, equally spaced on the `[0, 2π]`
 ```
     mkdir build
     cd build
-    cmake -DUSE_FLOAT=ON .. # Remove -DUSE_FLOAT 
+    cmake -DUSE_FLOAT=ON ..
     make
 ```
 

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(SineSum)
 
+set(CMAKE_CXX_COMPILER "/usr/bin/g++-11")
+
 option(USE_FLOAT "Use float precision instead of double" OFF)
 
 if(USE_FLOAT)

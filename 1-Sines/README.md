@@ -7,7 +7,7 @@ Calculation of the sum of sines of 10^7 values, equally spaced on the `[0, 2π]`
 ```
     mkdir build
     cd build
-    cmake -DUSE_FLOAT=ON ..
+    cmake -DCMAKE_CXX_COMPILER=/usr/bin/g++-11 -DUSE_FLOAT=ON ..
     make
 ```
 
@@ -16,7 +16,7 @@ Calculation of the sum of sines of 10^7 values, equally spaced on the `[0, 2π]`
 ```
     mkdir build
     cd build
-    cmake -DUSE_FLOAT=OFF .. # Or simply remove -DUSE_FLOAT argument.
+    cmake -DCMAKE_CXX_COMPILER=/usr/bin/g++-11 -DUSE_FLOAT=OFF .. # Or simply remove -DUSE_FLOAT argument.
     make
 ```
 
@@ -29,6 +29,6 @@ Calculation of the sum of sines of 10^7 values, equally spaced on the `[0, 2π]`
 # Reported sum values
 
 ```
-    Float sum: -0.16503
-    Double sum: 3.68912e-10
+    Float sum: 0.349212
+    Double sum: -6.76916e-10
 ```

@@ -29,6 +29,6 @@ Calculation of the sum of sines of 10^7 values, equally spaced on the `[0, 2π]`
 # Reported sum values
 
 ```
-    Float sum: 0.349212
-    Double sum: -6.76916e-10
+    Float sum: 0.094364
+    Double sum: 4.89582e-11
 ```

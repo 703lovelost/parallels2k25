@@ -25,6 +25,6 @@ Use `make clean` to remove the executable file.
 # Reported sum values
 
 ```
-    Float sum: 0.349212
-    Double sum: -6.76916e-10
+    Float sum: 0.094364
+    Double sum: 4.89582e-11
 ```

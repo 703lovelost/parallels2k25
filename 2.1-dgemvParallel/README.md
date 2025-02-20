@@ -227,3 +227,5 @@ Use `make clean` to remove the executable file.
 ## Conclusion on thread usage
 
 By using threads, the program gets successfully scaled. But, as we can see on the graph below, we cannot reach the linear S(p)/p relationship by increasing the amount of threads. At one moment, the thread increase gets progressively less useful for scaling.
+
+<img src="https://i.imgur.com/9PIItFd.png">

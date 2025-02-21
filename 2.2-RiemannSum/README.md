@@ -182,6 +182,6 @@ Use `make clean` to remove the executable file.
 
 ## Conclusion on thread usage
 
-????
+As we can see on the graph below, some small usage of threads can result in performance close to linear. But by increasing the number of threads, the relationship ends up being from slightly worse to the point, where the results are extremely far from linear values.
 
 <img src="./scalingdiagram.png">

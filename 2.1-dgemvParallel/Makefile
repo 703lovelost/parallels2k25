@@ -6,7 +6,7 @@ TARGET = dgemv
 all: $(TARGET)
 
 $(TARGET): main.c
-	$(CXX) $(CXXFLAGS) -o $(TARGET) main.c -lm
+	$(CXX) $(CXXFLAGS) -o $(TARGET) main.c
 
 clean:
 	rm -f $(TARGET)

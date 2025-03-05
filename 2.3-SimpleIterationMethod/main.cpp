@@ -4,77 +4,97 @@
 #include <vector>
 #include <chrono>
 #include <omp.h>
+#include <cmath>
 
-void simple_iteration(std::vector<std::vector<double>> A, std::vector<double> v,
-                    std::vector<double> u, int matrix_size, int num_threads)
-{
-    #pragma omp parallel num_threads(num_threads)
-    {
-        int thread_num = omp_get_thread_num();
-        double tau = 0.01;
-        double eps = 0.0001;
-        double u_mult_fold = std::accumulate(std::begin(u), std::end(u), 1.0, std::multiplies<double>());
+#define TAU 0.01
+#define EPS 0.0001
 
-        int items_per_thread = matrix_size / num_threads;
-        int lb = thread_num * items_per_thread;
-        int ub = (thread_num == num_threads - 1) ? (matrix_size - 1) : (lb + items_per_thread - 1);
-
-        for (;;) {
-            break;
-            // std::vector<double> Av_minus_u;
-            // std::vector<double> 
-
-            // for (int i = lb; i <= ub; i++) {
-            //     for (int j = 0; j < matrix_size; j++) {
-            //         Av_minus_u[i] = (A[i][j] * v[j]) - u[j];
-            //     }
-            // }
-          
-            // double Av_minux_u_mult_fold = std::accumulate(std::begin(Av_minus_u), std::end(Av_minus_u), 1.0, std::multiplies<double>());
+double euclid_norm(std::vector<double> vector, int N) {
+    double euclid = 0.0;
     
-            // if (Av_minux_u_mult_fold / u_mult_fold < eps) {
-
-            // }
-            // v[j] -= (tau * Av_minus_u);
-        }
-        
-
+    for (int i = 0; i < N; i++) {
+        euclid += pow(vector[i], 2.0);
     }
+
+    return sqrt(euclid);
 }
 
-double run(int matrix_size, int num_threads) {
-    std::vector<std::vector<double>> A(matrix_size,
-                                        std::vector<double>(matrix_size, 0));   // Matrix A
-    std::vector<double> v;                                                      // Vector v
-    std::vector<double> u;                                                      // Vector u
-    double t;                                                                   // For time measurement
+std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
+                                    std::vector<double>& v,
+                                    std::vector<double>& u,
+                                    int matrix_size,
+                                    int num_threads,
+                                    const std::string& schedule_type)
+{
+    std::vector<double> Av_minus_u(matrix_size, 0.0);
+    double Av_minus_u_euclid;
+    double u_euclid;
 
-    for (int i = 0; i < matrix_size; i++) {
-        for (int j = 0; j < matrix_size; j++) {
-            if (i == j) {
-                A[i][j] = 2.0;
-            }
-            else {
-                A[i][j] = 1.0;
+    u_euclid = euclid_norm(u, matrix_size);
+    // To avoid loop end miscalculation.
+    Av_minus_u_euclid = u_euclid;
+
+    do {
+        if (schedule_type == "guided") {
+            #pragma omp parallel for num_threads(num_threads) schedule(guided)
+            for (int i = 0; i < matrix_size; i++) {
+                double Av = 0.0;
+                for (int j = 0; j < matrix_size; j++) {
+                    Av += A[i][j] * v[j];
+                }
+                Av_minus_u[i] += Av - u[i];
             }
         }
-    }
+        else {
+            #pragma omp parallel for num_threads(num_threads) schedule(static)
+            for (int i = 0; i < matrix_size; i++) {
+                double Av = 0.0;
+                for (int j = 0; j < matrix_size; j++) {
+                    Av += A[i][j] * v[j];
+                }
+                Av_minus_u[i] += Av - u[i];
+            }
+        }
+
+
+        Av_minus_u_euclid = euclid_norm(Av_minus_u, matrix_size);
+
+        if (schedule_type == "guided") {
+            #pragma omp parallel for num_threads(num_threads) schedule(guided)
+            for (int i = 0; i < matrix_size; i++) {
+                v[i] -= TAU * Av_minus_u[i];
+                Av_minus_u[i] = 0.0;
+            }
+        }
+        else {
+            #pragma omp parallel for num_threads(num_threads) schedule(static)
+            for (int i = 0; i < matrix_size; i++) {
+                v[i] -= TAU * Av_minus_u[i];
+                Av_minus_u[i] = 0.0;
+            }
+        }
+
+    } while (Av_minus_u_euclid / u_euclid > EPS);
+
+    return v;
+}
+
+double run(int matrix_size, int num_threads, const std::string& schedule_type) {
+    std::vector<std::vector<double>> A(matrix_size,
+                                        std::vector<double>(matrix_size, 1.0));               // Matrix A
+    std::vector<double> v(matrix_size, 0.0);                                                  // Vector v
+    std::vector<double> u(matrix_size, matrix_size + 1);                                      // Vector u
 
     for (int i = 0; i < matrix_size; i++) {
-        v[i] = 0;
-    }
-
-    for (int i = 0; i < matrix_size; i++) {
-        u[i] = matrix_size + 1.0;
+        A[i][i] = 2.0;
     }
 
     const auto start{std::chrono::steady_clock::now()};
-    simple_iteration(A, v, u, matrix_size, num_threads);
+    v = simple_iteration(A, v, u, matrix_size, num_threads, schedule_type);
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
-    t = elapsed_seconds.count();
 
-    return t;
+    return elapsed_seconds.count();
 }
 
 int main(int argc, char *argv[]) {
@@ -86,11 +106,19 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    num_threads = atoi(argv[1]);
-    matrix_size = atoi(argv[2]);
+    try {
+        num_threads = std::stoi(argv[1]);
+        matrix_size = std::stoi(argv[2]);
+    } catch (const std::invalid_argument& e) {
+        std::cerr << "Invalid argument: " << e.what() << "\n";
+        return 1;
+    } catch (const std::out_of_range& e) {
+        std::cerr << "Argument out of range: " << e.what() << "\n";
+        return 1;
+    }
 
     // Default settings in case of wrong input.
-    // Based on atoi() conversion behavior.
+    // Based on stoi() conversion behavior.
     if (matrix_size == 0) {
         matrix_size = 20000;
     }
@@ -98,13 +126,16 @@ int main(int argc, char *argv[]) {
     std::cout << "Number of threads used: " << num_threads << "\n";
     std::cout << "The size of the matrix: " << matrix_size << " x " << matrix_size << "\n";
 
-    tserial = run(matrix_size, 1);
+    tserial = run(matrix_size, 1, "serial");
     std::cout << "Elapsed time (serial): " << std::setprecision(12) << tserial << "\n";
 
     if (num_threads > 1) {
-        tparallel = run(matrix_size, num_threads);
-        std::cout << "Elapsed time (parallel): " << std::setprecision(12) << tparallel << "\n";
-        std::cout << "Elapsed time (parallel): " << std::setprecision(2) << tserial / tparallel << "\n";  
+        std::vector<std::string> schedules = {"static", "guided"};
+        for (const auto& schedule : schedules) {
+            tparallel = run(matrix_size, num_threads, schedule);
+            std::cout << "Elapsed time (parallel, schedule = " << schedule << "): " << std::setprecision(12) << tparallel << "\n";
+            std::cout << "Speedup: " << std::setprecision(6) << tserial / tparallel << "\n";  
+        }
     }
 
     return 0;

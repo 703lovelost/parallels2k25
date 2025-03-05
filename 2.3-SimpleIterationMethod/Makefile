@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -fopenmp -std=c++17
+CXXFLAGS = -fopenmp -std=c++17 -O2
 
 FILENAME = main.cpp
 TARGET = dgemv

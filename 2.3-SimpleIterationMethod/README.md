@@ -1,6 +1,6 @@
 Simple iteration method to approximate ***v*** vector in ***Av=u*** equations.
 
-This solution proves that values of ***v -> J_(1, matrixsize)***, having ***A = J_matrixsize + (2 \* Id)*** and ***u = J_(1, matrixsize) \* (matrixsize + 1)***
+This solution proves that values of ***v -> J_(1, matrixsize)***, having ***A = J_matrixsize + Id*** and ***u = J_(1, matrixsize) \* (matrixsize + 1)***
 
 # Build 
 

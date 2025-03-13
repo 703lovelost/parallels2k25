@@ -42,6 +42,8 @@ Use `make clean` to remove the executable file.
 
 ## Scaling
 
+*NOTE:* The current implementation uses **matrix_size / num_threads** chunks, so there's no big difference between dynamic and guided scheduling, in this case.
+
 <style type="text/css">
     .tg-c3ow {
         background-color:rgb(235, 235, 235);
@@ -197,10 +199,6 @@ Use `make clean` to remove the executable file.
 All the paralleling rules were linked to a specific loops of iteration process:
 `#pragma omp parallel for num_threads(N) schedule(sch)`
 
-For small matrices, schedule changes (and the paralleling rules at all) couldn't make any impact on processing.
-
-Looking at the 1000x1000 matrix size, there's definitely a positive effect on guided thread scheduling. However, as the matrix was expanding, guided scheduling went from approx. equally effective as static scheduling (2000x2000) to being more of a slowing solution.
-
-Furthermore, by increasing the thread amount, both scheduling rules tend to have the same performance in speedup.
+The scaling on the graph looks unstable due to small matrix sizes (mentioned in scaling table above) and how threads are busy in the moment of initiating. As a result, the dynamic / guided thread distribution can end more badly or make no impact, giving the fact that the amount of work is not enough.
 
 <img src="./scalingdiagram.png">

@@ -34,9 +34,12 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
     // To avoid loop end miscalculation.
     Av_minus_u_euclid = u_euclid;
 
+    #pragma omp parallel num_threads(num_threads)
+    {
+
     do {
-        if (schedule_type == "guided") {
-            #pragma omp parallel for num_threads(num_threads) schedule(guided)
+        if (schedule_type == "dynamic") {
+            #pragma omp for schedule(dynamic, matrix_size/num_threads)
             for (int i = 0; i < matrix_size; i++) {
                 double Av = 0.0;
                 for (int j = 0; j < matrix_size; j++) {
@@ -46,7 +49,7 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
             }
         }
         else {
-            #pragma omp parallel for num_threads(num_threads) schedule(static)
+            #pragma omp for schedule(static, matrix_size/num_threads)
             for (int i = 0; i < matrix_size; i++) {
                 double Av = 0.0;
                 for (int j = 0; j < matrix_size; j++) {
@@ -56,18 +59,20 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
             }
         }
 
+        #pragma omp barrier
 
+        #pragma omp master
         Av_minus_u_euclid = euclid_norm(Av_minus_u, matrix_size);
 
-        if (schedule_type == "guided") {
-            #pragma omp parallel for num_threads(num_threads) schedule(guided)
+        if (schedule_type == "dynamic") {
+            #pragma omp for schedule(dynamic, matrix_size/num_threads)
             for (int i = 0; i < matrix_size; i++) {
                 v[i] -= TAU * Av_minus_u[i];
                 Av_minus_u[i] = 0.0;
             }
         }
         else {
-            #pragma omp parallel for num_threads(num_threads) schedule(static)
+            #pragma omp for schedule(static, matrix_size/num_threads)
             for (int i = 0; i < matrix_size; i++) {
                 v[i] -= TAU * Av_minus_u[i];
                 Av_minus_u[i] = 0.0;
@@ -75,6 +80,8 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
         }
 
     } while (Av_minus_u_euclid / u_euclid > EPS);
+
+    }
 
     return v;
 }
@@ -130,7 +137,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Elapsed time (serial): " << std::setprecision(12) << tserial << "\n";
 
     if (num_threads > 1) {
-        std::vector<std::string> schedules = {"static", "guided"};
+        std::vector<std::string> schedules = {"static", "dynamic"};
         for (const auto& schedule : schedules) {
             tparallel = run(matrix_size, num_threads, schedule);
             std::cout << "Elapsed time (parallel, schedule = " << schedule << "): " << std::setprecision(12) << tparallel << "\n";

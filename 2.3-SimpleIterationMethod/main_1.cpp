@@ -60,7 +60,7 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
 
             #pragma omp barrier
 
-            #pragma omp single
+            #pragma omp master
             {
                 Av_minus_u_euclid = euclid_norm(Av_minus_u, matrix_size);
             }

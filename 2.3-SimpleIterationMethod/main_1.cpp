@@ -29,14 +29,15 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
     std::vector<double> Av_minus_u(matrix_size, 0.0);
     double Av_minus_u_euclid;
     double u_euclid;
+    int abort = 0;
 
     u_euclid = euclid_norm(u, matrix_size);
     // To avoid loop end miscalculation.
     Av_minus_u_euclid = u_euclid;
 
-    do {
-        #pragma omp parallel num_threads(num_threads)
-        {
+    #pragma omp parallel num_threads(num_threads)
+    {
+        do {
             if (schedule_type == "dynamic") {
                 #pragma omp for schedule(dynamic, matrix_size/num_threads)
                 for (int i = 0; i < matrix_size; i++) {
@@ -57,8 +58,6 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
                     Av_minus_u[i] += Av - u[i];
                 }
             }
-
-            #pragma omp barrier
 
             #pragma omp master
             {
@@ -79,8 +78,14 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
                     Av_minus_u[i] = 0.0;
                 }
             }
+            
+            #pragma omp single
+            if (Av_minus_u_euclid / u_euclid > EPS) {
+                abort = 1;
+            }
         }
-    } while (Av_minus_u_euclid / u_euclid > EPS);
+        while (abort != 1);
+    }
 
     return v;
 }

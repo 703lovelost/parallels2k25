@@ -34,54 +34,53 @@ std::vector<double> simple_iteration(std::vector<std::vector<double>>& A,
     // To avoid loop end miscalculation.
     Av_minus_u_euclid = u_euclid;
 
-    #pragma omp parallel num_threads(num_threads)
-    {
-
     do {
-        if (schedule_type == "dynamic") {
-            #pragma omp for schedule(dynamic, matrix_size/num_threads)
-            for (int i = 0; i < matrix_size; i++) {
-                double Av = 0.0;
-                for (int j = 0; j < matrix_size; j++) {
-                    Av += A[i][j] * v[j];
+        #pragma omp parallel num_threads(num_threads)
+        {
+            if (schedule_type == "dynamic") {
+                #pragma omp for schedule(dynamic, matrix_size/num_threads)
+                for (int i = 0; i < matrix_size; i++) {
+                    double Av = 0.0;
+                    for (int j = 0; j < matrix_size; j++) {
+                        Av += A[i][j] * v[j];
+                    }
+                    Av_minus_u[i] += Av - u[i];
                 }
-                Av_minus_u[i] += Av - u[i];
             }
-        }
-        else {
-            #pragma omp for schedule(static, matrix_size/num_threads)
-            for (int i = 0; i < matrix_size; i++) {
-                double Av = 0.0;
-                for (int j = 0; j < matrix_size; j++) {
-                    Av += A[i][j] * v[j];
+            else {
+                #pragma omp for schedule(static, matrix_size/num_threads)
+                for (int i = 0; i < matrix_size; i++) {
+                    double Av = 0.0;
+                    for (int j = 0; j < matrix_size; j++) {
+                        Av += A[i][j] * v[j];
+                    }
+                    Av_minus_u[i] += Av - u[i];
                 }
-                Av_minus_u[i] += Av - u[i];
+            }
+
+            #pragma omp barrier
+
+            #pragma omp single
+            {
+                Av_minus_u_euclid = euclid_norm(Av_minus_u, matrix_size);
+            }
+
+            if (schedule_type == "dynamic") {
+                #pragma omp for schedule(dynamic, matrix_size/num_threads)
+                for (int i = 0; i < matrix_size; i++) {
+                    v[i] -= TAU * Av_minus_u[i];
+                    Av_minus_u[i] = 0.0;
+                }
+            }
+            else {
+                #pragma omp for schedule(static, matrix_size/num_threads)
+                for (int i = 0; i < matrix_size; i++) {
+                    v[i] -= TAU * Av_minus_u[i];
+                    Av_minus_u[i] = 0.0;
+                }
             }
         }
-
-        #pragma omp barrier
-
-        #pragma omp master
-        Av_minus_u_euclid = euclid_norm(Av_minus_u, matrix_size);
-
-        if (schedule_type == "dynamic") {
-            #pragma omp for schedule(dynamic, matrix_size/num_threads)
-            for (int i = 0; i < matrix_size; i++) {
-                v[i] -= TAU * Av_minus_u[i];
-                Av_minus_u[i] = 0.0;
-            }
-        }
-        else {
-            #pragma omp for schedule(static, matrix_size/num_threads)
-            for (int i = 0; i < matrix_size; i++) {
-                v[i] -= TAU * Av_minus_u[i];
-                Av_minus_u[i] = 0.0;
-            }
-        }
-
     } while (Av_minus_u_euclid / u_euclid > EPS);
-
-    }
 
     return v;
 }

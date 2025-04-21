@@ -128,7 +128,7 @@ class ImageWindow:
                 if self.frame is not None:
                     cv2.putText(
                         self.frame,
-                        f"Sensor1: {self._sensor_data[0]}  Sensor2: {self._sensor_data[1]}  Sensor3: {self._sensor_data[2]}", 
+                        f'Sensor1: {self._sensor_data[0]}  Sensor2: {self._sensor_data[1]}  Sensor3: {self._sensor_data[2]}', 
                         (10, self._height-10), 
                         cv2.FONT_HERSHEY_SIMPLEX, 
                         0.8, 
@@ -137,7 +137,7 @@ class ImageWindow:
                     )
                     cv2.imshow('Camera and Sensors', self.frame)
         except Exception as e:
-            logger.error(f"Error in show(): {str(e)}")
+            logger.error(f'Error in show(): {str(e)}')
 
     def stop(self):
         cv2.destroyAllWindows()
@@ -146,11 +146,11 @@ class ImageWindow:
         self.stop()
 
 def main():
-    parser = argparse.ArgumentParser(description="Camera and sensors display")
-    parser.add_argument("--camIndex", type=int, default=0, help="Camera index in system")
-    parser.add_argument("--height", type=int, default=480, help="Camera height resolution")
-    parser.add_argument("--width", type=int, default=720, help="Camera width resolution")
-    parser.add_argument("--fps", type=int, default=15, help="Display refresh rate")
+    parser = argparse.ArgumentParser(description='Camera and sensors display')
+    parser.add_argument('--camIndex', type=int, default=0, help='Camera index in system')
+    parser.add_argument('--height', type=int, default=480, help='Camera height resolution')
+    parser.add_argument('--width', type=int, default=720, help='Camera width resolution')
+    parser.add_argument('--fps', type=int, default=15, help='Display refresh rate')
     args = parser.parse_args()
 
     flag = threading.Event()
@@ -191,20 +191,20 @@ def main():
 
             key = cv2.waitKey(1) & 0xFF
             if key == 27:
-                logger.info("Exit requested by user.")
+                logger.info(f'Exit requested by user.')
                 break
             
             time.sleep(1 / args.fps)
     
     except KeyboardInterrupt:
-        logger.info("Program interrupted by user.")
+        logger.info(f'Program interrupted by user.')
     except Exception as e:
-        logger.error(f"Main thread error: {str(e)}")
+        logger.error(f'Main thread error: {str(e)}')
     finally:
         flag.clear()
         for worker in workers:
             worker.join(timeout=1)
         cv2.destroyAllWindows()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

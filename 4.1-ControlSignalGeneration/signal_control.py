@@ -81,8 +81,10 @@ def sensor_worker(sensor: SensorX, queue: LifoQueue, flag: threading.Event):
     while flag.is_set():
         try:
             data = sensor.get()
-            if queue.full():
-                queue.get_nowait()
+            try:
+                queue.get_nowait()   
+            except:
+                pass    
             queue.put_nowait(data)
         except Exception as e:
             logger.error(f'Sensor worker error: {str(e)}')
@@ -94,8 +96,10 @@ def camera_worker(queue: Queue, flag: threading.Event, cam_idx: int, width: int,
         while flag.is_set():
             try:
                 frame = cam.get()
-                if queue.full():
-                    queue.get_nowait()
+                try:
+                    queue.get_nowait()   
+                except:
+                    pass    
                 queue.put_nowait(frame)
             except Exception as e:
                 logger.error(f'Camera worker error: {str(e)}')

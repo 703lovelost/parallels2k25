@@ -25,34 +25,36 @@ class VideoProcessor:
         self.cap = cv2.VideoCapture(video_path)
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        self.out = cv2.VideoWriter(output_path, self.fourcc, self.fps, (640, 480))
+        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.out = cv2.VideoWriter(output_path, self.fourcc, self.fps, (self.frame_width, self.frame_height))
         
     def __del__(self):
         self.cap.release()
         self.out.release()
         cv2.destroyAllWindows()
         
-    def process_single_thread(self, video_path, output_path):
+    def process_single_thread(self):
         model = ModelWrapper()
 
         frame_count = 0
         start_time = time.time()
         while self.cap.isOpened():
-            ret, frame = cap.read()
+            ret, frame = self.cap.read()
             if not ret:
                 break
             result = model.predict(frame)
             annotated = result.plot(boxes=False, labels=False)
-            out.write(annotated)
+            self.out.write(annotated)
             frame_count += 1
         end_time = time.time()
 
-        cap.release()
-        out.release()
+        self.cap.release()
+        self.out.release()
 
         return end_time - start_time
 
-    def process_multi_thread(self, video_path, output_path, num_workers):
+    def process_multi_thread(self):
         input_queue = Queue()
         output_dict = {}
         lock = threading.Lock()
@@ -71,28 +73,28 @@ class VideoProcessor:
                     output_dict[index] = annotated
                 input_queue.task_done()
 
-        threads = [threading.Thread(target=worker, args=(i,), daemon=True) for i in range(num_workers)]
+        threads = [threading.Thread(target=worker, args=(i,), daemon=True) for i in range(self.num_threads)]
         for t in threads:
             t.start()
 
         index = 0
         start_time = time.time()
         while True:
-            ret, frame = cap.read()
+            ret, frame = self.cap.read()
             if not ret:
                 break
             input_queue.put((index, frame))
             index += 1
 
-        cap.release()
+        self.cap.release()
         input_queue.join()
         finished_event.set()
 
         for i in range(index):
             while i not in output_dict:
                 time.sleep(0.01)
-            out.write(output_dict[i])
-        out.release()
+            self.out.write(output_dict[i])
+        self.out.release()
 
         end_time = time.time()
         

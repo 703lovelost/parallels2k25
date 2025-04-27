@@ -60,7 +60,7 @@ class VideoProcessor:
         lock = threading.Lock()
         finished_event = threading.Event()
 
-        def worker(worker_id):
+        def worker():
             model = ModelWrapper()
             while not finished_event.is_set():
                 try:
@@ -73,7 +73,7 @@ class VideoProcessor:
                     output_dict[index] = annotated
                 input_queue.task_done()
 
-        threads = [threading.Thread(target=worker, args=(i,), daemon=True) for i in range(self.num_threads)]
+        threads = [threading.Thread(target=worker, daemon=True) for i in range(self.num_threads)]
         for t in threads:
             t.start()
 

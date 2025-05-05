@@ -58,19 +58,21 @@ class VideoProcessor:
         input_queue = Queue()
         output_dict = {}
         lock = threading.Lock()
+        condition = threading.Condition(lock)
         finished_event = threading.Event()
 
         def worker():
             model = ModelWrapper()
             while not finished_event.is_set():
                 try:
-                    index, frame = input_queue.get(timeout=1)
+                    index, frame = input_queue.get_nowait()
                 except:
                     continue
                 result = model.predict(frame)
                 annotated = result.plot(boxes=False, labels=False)
                 with lock:
                     output_dict[index] = annotated
+                    condition.notify_all()
                 input_queue.task_done()
 
         threads = [threading.Thread(target=worker, daemon=True) for i in range(self.num_threads)]
@@ -90,12 +92,12 @@ class VideoProcessor:
         input_queue.join()
         finished_event.set()
 
-        for i in range(index):
-            while i not in output_dict:
-                time.sleep(0.01)
-            self.out.write(output_dict[i])
-        self.out.release()
+        print("Generating video...")
 
+        for i in range(index):
+            self.out.write(output_dict[i])
+
+        self.out.release()
         end_time = time.time()
         
         return end_time - start_time

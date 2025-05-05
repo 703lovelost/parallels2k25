@@ -58,7 +58,6 @@ class VideoProcessor:
         input_queue = Queue()
         output_dict = {}
         lock = threading.Lock()
-        condition = threading.Condition(lock)
         finished_event = threading.Event()
 
         def worker():
@@ -72,7 +71,6 @@ class VideoProcessor:
                 annotated = result.plot(boxes=False, labels=False)
                 with lock:
                     output_dict[index] = annotated
-                    condition.notify_all()
                 input_queue.task_done()
 
         threads = [threading.Thread(target=worker, daemon=True) for i in range(self.num_threads)]

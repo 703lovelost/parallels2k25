@@ -55,31 +55,28 @@ class VideoProcessor:
         return end_time - start_time
 
     def process_multi_thread(self):
-        input_queue = Queue(maxsize=self.num_threads * 2)
+        input_queue = Queue()
         output_dict = {}
         lock = threading.Lock()
         stop_event = threading.Event()
 
         def worker():
             model = ModelWrapper()
-            while not stop_event.is_set() or not input_queue.empty():
+            while not stop_event.is_set():
                 try:
-                    index, frame = input_queue.get_nowait(timeout=0.1)
+                    index, frame = input_queue.get(timeout=0.1)
+                    result = model.predict(frame)
+                    annotated = result.plot(boxes=False, labels=False)
+                    with lock:
+                        output_dict[index] = annotated
+                    input_queue.task_done()
                 except:
-                    if stop_event.is_set():
-                        break
                     continue
-                
-                result = model.predict(frame)
-                annotated = result.plot(boxes=False, labels=False)
-                with lock:
-                    output_dict[index] = annotated
-                input_queue.task_done()
 
         index = 0
         start_time = time.time()
 
-        for _ in range(self.num_threads * 2):
+        for _ in range(self.num_threads * 3):
             ret, frame = self.cap.read()
             if not ret:
                 break
@@ -89,6 +86,7 @@ class VideoProcessor:
         threads = []
         for _ in range(self.num_threads):
             t = threading.Thread(target=worker)
+            t.daemon = True
             t.start()
             threads.append(t)
 
@@ -100,9 +98,9 @@ class VideoProcessor:
             index += 1
 
         self.cap.release()
-        stop_event.set()
 
         input_queue.join()
+        stop_event.set()
 
         for t in threads:
             t.join()

@@ -55,30 +55,43 @@ class VideoProcessor:
         return end_time - start_time
 
     def process_multi_thread(self):
-        input_queue = Queue()
+        input_queue = Queue(maxsize=self.num_threads * 2)
         output_dict = {}
         lock = threading.Lock()
-        finished_event = threading.Event()
+        stop_event = threading.Event()
 
         def worker():
             model = ModelWrapper()
-            while not finished_event.is_set():
+            while not stop_event.is_set() or not input_queue.empty():
                 try:
-                    index, frame = input_queue.get_nowait()
+                    index, frame = input_queue.get_nowait(timeout=0.1)
                 except:
+                    if stop_event.is_set():
+                        break
                     continue
+                
                 result = model.predict(frame)
                 annotated = result.plot(boxes=False, labels=False)
                 with lock:
                     output_dict[index] = annotated
                 input_queue.task_done()
 
-        threads = [threading.Thread(target=worker, daemon=True) for i in range(self.num_threads)]
-        for t in threads:
-            t.start()
-
         index = 0
         start_time = time.time()
+
+        for _ in range(self.num_threads * 2):
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            input_queue.put((index, frame))
+            index += 1
+
+        threads = []
+        for _ in range(self.num_threads):
+            t = threading.Thread(target=worker)
+            t.start()
+            threads.append(t)
+
         while True:
             ret, frame = self.cap.read()
             if not ret:
@@ -87,8 +100,12 @@ class VideoProcessor:
             index += 1
 
         self.cap.release()
+        stop_event.set()
+
         input_queue.join()
-        finished_event.set()
+
+        for t in threads:
+            t.join()
 
         print("Generating video...")
 

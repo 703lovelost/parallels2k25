@@ -66,17 +66,21 @@ class VideoProcessor:
             model = ModelWrapper()
             while not stop_event.is_set():
                 with condition:
-                    while not queue_started:
+                    while not queue_started and not stop_event.is_set():
                         condition.wait()
                 
-                index, frame = input_queue.get()
-                if index is None:
-                    break
-                result = model.predict(frame)
-                annotated = result.plot(boxes=False, labels=False)
-                with lock:
-                    output_dict[index] = annotated
-                input_queue.task_done()
+                try:
+                    index, frame = input_queue.get(timeout=0.1)
+                    if index is None:
+                        input_queue.task_done()
+                        break
+                    result = model.predict(frame)
+                    annotated = result.plot(boxes=False, labels=False)
+                    with lock:
+                        output_dict[index] = annotated
+                    input_queue.task_done()
+                except:
+                    continue
 
         index = 0
         start_time = time.time()

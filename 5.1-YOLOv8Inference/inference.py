@@ -59,24 +59,29 @@ class VideoProcessor:
         output_dict = {}
         lock = threading.Lock()
         stop_event = threading.Event()
+        condition = threading.Condition()
+        queue_started = False
 
         def worker():
             model = ModelWrapper()
             while not stop_event.is_set():
-                try:
-                    index, frame = input_queue.get(timeout=0.1)
-                    result = model.predict(frame)
-                    annotated = result.plot(boxes=False, labels=False)
-                    with lock:
-                        output_dict[index] = annotated
-                    input_queue.task_done()
-                except:
-                    continue
+                with condition:
+                    while not queue_started:
+                        condition.wait()
+                
+                index, frame = input_queue.get()
+                if index is None:
+                    break
+                result = model.predict(frame)
+                annotated = result.plot(boxes=False, labels=False)
+                with lock:
+                    output_dict[index] = annotated
+                input_queue.task_done()
 
         index = 0
         start_time = time.time()
 
-        for _ in range(self.num_threads * 3):
+        for _ in range(self.num_threads * self.num_threads):
             ret, frame = self.cap.read()
             if not ret:
                 break
@@ -90,6 +95,10 @@ class VideoProcessor:
             t.start()
             threads.append(t)
 
+        with condition:
+            queue_started = True
+            condition.notify_all()
+
         while True:
             ret, frame = self.cap.read()
             if not ret:
@@ -98,6 +107,9 @@ class VideoProcessor:
             index += 1
 
         self.cap.release()
+
+        for _ in range(self.num_threads):
+            input_queue.put((None, None))
 
         input_queue.join()
         stop_event.set()

@@ -14,7 +14,7 @@ set(CMAKE_CXX_COMPILER nvc++)
 set(CUDA_HOME "/opt/nvidia/hpc_sdk/Linux_x86_64/24.5/cuda/12.4")
 
 if(USE_GPU)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -acc -gpu=cc89 -stdpar=gpu -Minfo=accel -O3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -acc -gpu=cc70 -stdpar=gpu -Minfo=accel -O3 -g")
     message(STATUS "Building with Tesla support")
 else()
   if(USE_MULTICORE)
@@ -37,4 +37,7 @@ target_include_directories(heat2d PRIVATE
 target_link_directories(heat2d PRIVATE
   ${CUDA_HOME}/lib64
 )
-target_link_libraries(heat2d PRIVATE cudart)
+
+if (USE_GPU)
+  target_link_libraries(heat2d PRIVATE cudart)
+endif()

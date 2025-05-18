@@ -1,3 +1,4 @@
 build/
 *.csv
-*.png
+*.sqlite
+*-rep

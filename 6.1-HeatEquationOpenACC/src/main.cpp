@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     initInterior(A,    N);
     initInterior(Anew, N);
 
-    long iter     = 0;
+    long   iter   = 0;
     double maxErr = 0.0;
 
     auto t_start = std::chrono::high_resolution_clock::now();
@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
             jacobiIteration(A, Anew, N, maxErr);
             swapGrids(A, Anew);
             ++iter;
+            std::cout << "Iteration " << iter << ": maxError = " << maxErr << std::endl;
         } while (maxErr > opt.tol && iter < opt.maxIter);
     }
 
@@ -44,6 +45,3 @@ int main(int argc, char** argv) {
     free(Anew);
     return 0;
 }
-
-
-// std::cout << "Iter " << iter << ": maxError = " << maxError << std::endl;

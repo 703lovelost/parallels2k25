@@ -1,5 +1,4 @@
 #include <cmath>
-#include <algorithm>
 #include <iostream>
 #include <boost/program_options.hpp>
 
@@ -16,15 +15,15 @@ Options parseOptions(int argc, char** argv) {
         ("max-iter", po::value<long>(&opt.maxIter)->default_value(1000000));
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
-    if (vm.count("help")) { std::cout << desc << std::endl; std::exit(0); }
+    if (vm.count("help")) { std::cout << desc << "\n"; std::exit(0); }
     po::notify(vm);
     return opt;
 }
 
 void initInterior(double* __restrict A, int N) {
-    for (int j = 1; j < N-1; ++j) {
+    for (int j = 1; j < N - 1; ++j) {
         double* row = A + j * N;
-        for (int i = 1; i < N-1; ++i) {
+        for (int i = 1; i < N - 1; ++i) {
             row[i] = 0.0;
         }
     }
@@ -39,17 +38,12 @@ void jacobiIteration(const double* __restrict A,
     double localErr = 0.0;
 
     #pragma acc parallel loop collapse(2) present(A[0:NM], Anew[0:NM]) reduction(max:localErr)
-    for (int j = 1; j < N-1; ++j) {
-        const double* row      = A    + j * N;
-        const double* row_above = row  - N;
-        const double* row_below = row  + N;
-        double*       row_new   = Anew + j * N;
-
-        for (int i = 1; i < N-1; ++i) {
-            double v = 0.25 * ( row[i-1] + row[i+1]
-                              + row_above[i] + row_below[i] );
-            row_new[i] = v;
-            double diff = std::fabs(v - row[i]);
+    for (int j = 1; j < N - 1; ++j) {
+        for (int i = 1; i < N - 1; ++i) {
+            int    idx       = j * N + i;
+            double v         = 0.25 * (A[idx-1] + A[idx+1] + A[idx+N] + A[idx-N]);
+            Anew[idx]        = v;
+            double diff      = std::fabs(v - A[idx]);
             if (diff > localErr) localErr = diff;
         }
     }
@@ -59,5 +53,5 @@ void jacobiIteration(const double* __restrict A,
 
 void printSummary(long iter, double maxError) {
     std::cout << "Iterations: " << iter
-              << ", Max Error: " << maxError << std::endl;
+              << ", Max Error: " << maxError << "\n";
 }

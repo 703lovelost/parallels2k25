@@ -1,30 +1,22 @@
-// heat_solver.h
 #pragma once
-#include <vector>
 
-// Парсинг параметров командной строки
 struct Options {
-    int N;               // размер сетки
-    double tol;          // точность
-    long maxIter;        // макс. число итераций
+    int    N;
+    long   maxIter;
+    double tol;
 };
+
 Options parseOptions(int argc, char** argv);
 
-// Установка граничных условий (линейная интерполяция)
-void initBoundary(std::vector<double>& A, int N);
+void initInterior(double* __restrict A, int N);
 
-// Инициализация внутренней области нулями
-void initInterior(std::vector<double>& A, int N);
-
-// Одна итерация схемы Якоби + вычисление maxError
-void jacobiIteration(const std::vector<double>& A,
-                     std::vector<double>& Anew,
+void jacobiIteration(const double* __restrict A,
+                     double* __restrict Anew,
                      int N,
                      double& maxError);
 
-// Копирование Anew → A после итерации
-void swapGrids(std::vector<double>& A,
-               std::vector<double>& Anew);
+inline void swapGrids(double*& A, double*& Anew) {
+    double* tmp = A; A = Anew; Anew = tmp;
+}
 
-// Вывод результатов (количество итераций и ошибка)
 void printSummary(long iter, double maxError);

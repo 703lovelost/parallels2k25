@@ -1,45 +1,49 @@
 #include <iostream>
-#include <vector>
 #include <chrono>
+#include <cstdlib>
 
 #include "heat_solver.h"
 #include "boundary.h"
 
 int main(int argc, char** argv) {
-    // Чтение параметров: N, tol, maxIter
     auto opt = parseOptions(argc, argv);
-    int N = opt.N;
+    int N  = opt.N;
+    int NM = N * N;
 
-    // Выделение памяти для текущей и новой сетки
-    std::vector<double> A(N * N);
-    std::vector<double> Anew(N * N);
+    double* A    = static_cast<double*>(
+                     aligned_alloc(64, NM * sizeof(double)));
+    double* Anew = static_cast<double*>(
+                     aligned_alloc(64, NM * sizeof(double)));
 
-    // Инициализация: граничные условия и обнуление внутренней области
-    initBoundary(A, N);
+    initBoundary(A,    N);
     initBoundary(Anew, N);
-    initInterior(A, N);
+    initInterior(A,    N);
     initInterior(Anew, N);
 
-    long iter = 0;
-    double maxError = 0.0;
+    long iter     = 0;
+    double maxErr = 0.0;
 
-    // Засекаем время вычислений
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    // Основной цикл метода Якоби
-    do {
-        jacobiIteration(A, Anew, N, maxError);
-        swapGrids(A, Anew);
-        ++iter;
-        std::cout << "Iter " << iter << ": maxError = " << maxError << std::endl;
-    } while (maxError > opt.tol && iter < opt.maxIter);
+    #pragma acc data copy(A[0:NM]) copy(Anew[0:NM])
+    {
+        do {
+            jacobiIteration(A, Anew, N, maxErr);
+            swapGrids(A, Anew);
+            ++iter;
+        } while (maxErr > opt.tol && iter < opt.maxIter);
+    }
 
-    // Останавливаем таймер
     auto t_end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = t_end - t_start;
 
-    // Вывод результатов
-    printSummary(iter, maxError);
-    std::cout << "Elapsed time: " << elapsed.count() << " seconds" << std::endl;
+    printSummary(iter, maxErr);
+    std::cout << "Elapsed time: " << elapsed.count() << " sec\n";
+
+    free(A);
+    free(Anew);
     return 0;
 }
+
+
+// std::cout << "Iter " << iter << ": maxError = " << maxError << std::endl;

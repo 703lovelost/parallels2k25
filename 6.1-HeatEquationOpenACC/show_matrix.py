@@ -11,4 +11,7 @@ if __name__ == '__main__':
     plt.title('Heatmap of 10×10 Matrix')
     plt.xlabel('Column Index')
     plt.ylabel('Row Index')
-    plt.show()
+
+    output_path = 'matrix_10x10_heatmap.png'
+    plt.savefig(output_path)
+    print(f"Heatmap saved to {output_path}")

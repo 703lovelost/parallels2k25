@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
 
 #include "heat_solver.h"
 #include "boundary.h"
@@ -40,6 +41,18 @@ int main(int argc, char** argv) {
 
     printSummary(iter, maxErr);
     std::cout << "Elapsed time: " << elapsed.count() << " sec\n";
+
+    if (N == 10) {
+        std::ofstream fout("matrix_10x10.csv");
+        for (int j = 0; j < N; ++j) {
+            for (int i = 0; i < N; ++i) {
+                fout << A[j * N + i];
+                if (i < N - 1) fout << ",";
+            }
+            fout << "\n";
+        }
+        std::cout << "Matrix saved to matrix_10x10.csv\n";
+    }
 
     free(A);
     free(Anew);

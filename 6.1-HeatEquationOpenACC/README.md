@@ -14,7 +14,7 @@ Heat equation solving by using Jacobi iteration with Linf-norm error calculation
     scripts/build.sh OFF ON
 
     # GPU version
-    scripts/run.sh ON
+    scripts/build.sh ON
 ```
 
 # Run

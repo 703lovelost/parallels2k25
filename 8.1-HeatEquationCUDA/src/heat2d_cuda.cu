@@ -20,21 +20,24 @@ Options parseOptions(int argc, char** argv){
         ("max-iter", po::value<long>(&opt.maxIter)->default_value(1000000));
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
-    if(vm.count("help")){ std::cout<<desc<<"\n"; std::exit(0); }
+    if (vm.count("help")) {
+        std::cout << desc << "\n"; std::exit(0);
+    }
     po::notify(vm);
     return opt;
 }
 
 void printSummary(long iter, double maxError){
-    std::cout<<"Iterations: "<<iter<<", Max Error: "<<maxError<<"\n";
+    std::cout << "Iterations: " << iter << ", Max Error: " << maxError << "\n";
 }
 
 __global__ void jacobiKernel(const double* A, double* Anew, double* diff, int N){
-    int i = blockIdx.x*blockDim.x + threadIdx.x;
-    int j = blockIdx.y*blockDim.y + threadIdx.y;
-    if(i>0 && i<N-1 && j>0 && j<N-1){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i > 0 && i < N-1 && j > 0 && j < N-1){
         int idx = j*N + i;
-        double v = 0.25*(A[idx-1] + A[idx+1] + A[idx+N] + A[idx-N]);
+        double v = 0.25 * (A[idx-1] + A[idx+1] + A[idx+N] + A[idx-N]);
         Anew[idx] = v;
         diff[idx] = fabs(v - A[idx]);
     }
@@ -45,12 +48,17 @@ int main(int argc, char** argv){
     int N = opt.N;
     int NM = N*N;
 
+    int device_id = 3;
+    cudaError_t err = cudaSetDevice(device_id);
+    if (err != cudaSuccess) {
+        std::cerr << "Couldn't set up GPU " << device_id<<": " << cudaGetErrorString(err) << "\n";
+        std::exit(-1);
+    }
+
     double* hA    = (double*)malloc(NM*sizeof(double));
     double* hAnew = (double*)malloc(NM*sizeof(double));
-
     initBoundary(hA, N);
     initBoundary(hAnew, N);
-
     for (int j = 1; j < N-1; ++j)
         for (int i = 1; i < N-1; ++i) {
             hA[j * N + i] = 0.0;
@@ -58,7 +66,6 @@ int main(int argc, char** argv){
         }
 
     double *dA, *dAnew, *dDiff, *dMaxErr;
-
     cudaMalloc(&dA,    NM*sizeof(double));
     cudaMalloc(&dAnew, NM*sizeof(double));
     cudaMalloc(&dDiff, NM*sizeof(double));
@@ -68,46 +75,80 @@ int main(int argc, char** argv){
 
     void* dTempStorage = nullptr;
     size_t tempStorageBytes = 0;
-
     cub::DeviceReduce::Max(dTempStorage, tempStorageBytes, dDiff, dMaxErr, NM);
     cudaMalloc(&dTempStorage, tempStorageBytes);
 
-    int tx=16, ty=16;
-    dim3 threads(tx, ty);
-    dim3 blocks((N+tx-1)/tx, (N+ty-1)/ty);
-
-    double* hMaxErrHost;
+    double* hMaxErrHost = nullptr;
     cudaMallocHost(&hMaxErrHost, sizeof(double));
+
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
+    cudaGraph_t graphA, graphB;
+    cudaGraphExec_t graphAExec, graphBExec;
+
+    // Graph A (dA -> dAnew)
+    {
+        double* capA = dA;
+        double* capAnew = dAnew;
+        cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
+        jacobiKernel<<<dim3((N+15)/16, (N+15)/16), dim3(16,16), 0, stream>>>(capA, capAnew, dDiff, N);
+        cub::DeviceReduce::Max(dTempStorage, tempStorageBytes, dDiff, dMaxErr, NM, stream);
+        cudaMemcpyAsync(hMaxErrHost, dMaxErr, sizeof(double), cudaMemcpyDeviceToHost, stream);
+        cudaStreamEndCapture(stream, &graphA);
+        cudaGraphInstantiate(&graphAExec, graphA, nullptr, nullptr, 0);
+    }
+    // Graph B (dAnew -> dA)
+    {
+        double* capA = dAnew;
+        double* capAnew = dA;
+        cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
+        jacobiKernel<<<dim3((N+15)/16, (N+15)/16), dim3(16,16), 0, stream>>>(capA, capAnew, dDiff, N);
+        cub::DeviceReduce::Max(dTempStorage, tempStorageBytes, dDiff, dMaxErr, NM, stream);
+        cudaMemcpyAsync(hMaxErrHost, dMaxErr, sizeof(double), cudaMemcpyDeviceToHost, stream);
+        cudaStreamEndCapture(stream, &graphB);
+        cudaGraphInstantiate(&graphBExec, graphB, nullptr, nullptr, 0);
+    }
 
     long iter = 0;
     double maxErr = 1e9;
     auto t_start = std::chrono::high_resolution_clock::now();
-    while (maxErr > opt.tol && iter < opt.maxIter){
+    while (maxErr > opt.tol && iter < opt.maxIter) {
         ++iter;
-        jacobiKernel<<<blocks, threads>>>(dA, dAnew, dDiff, N);
-        cub::DeviceReduce::Max(dTempStorage, tempStorageBytes, dDiff, dMaxErr, NM);
-        cudaMemcpy(hMaxErrHost, dMaxErr, sizeof(double), cudaMemcpyDeviceToHost);
+        if (iter % 2 == 1) {
+            cudaGraphLaunch(graphAExec, stream);
+        } else {
+            cudaGraphLaunch(graphBExec, stream);
+        }
+        cudaStreamSynchronize(stream);
         maxErr = *hMaxErrHost;
-        std::cout<<"Iteration "<<iter<<": maxError = "<<maxErr<<"\n";
-        std::swap(dA, dAnew);
+        std::cout << "Iteration " << iter << ": maxError = " << maxErr << "\n";
     }
-    cudaDeviceSynchronize();
     auto t_end = std::chrono::high_resolution_clock::now();
+
+    cudaDeviceSynchronize();
     printSummary(iter, maxErr);
     std::chrono::duration<double> elapsed = t_end - t_start;
     std::cout << "Elapsed time: " << elapsed.count() << " sec\n";
-    
+
     if (N == 10) {
-        cudaMemcpy(hA, dA, NM*sizeof(double), cudaMemcpyDeviceToHost);
+        double* dResult = (iter % 2 == 0) ? dA : dAnew;
+        cudaMemcpy(hA, dResult, NM*sizeof(double), cudaMemcpyDeviceToHost);
         std::ofstream fout("matrix_10x10.csv");
-        for (int j = 0; j < N; ++j){
-            for (int i = 0; i < N; ++i){
+        for (int j = 0; j < N; ++j) {
+            for (int i = 0; i < N; ++i) {
                 fout << hA[j * N + i] << (i < N-1 ? "," : "");
             }
             fout << "\n";
         }
         std::cout << "Matrix saved to matrix_10x10.csv\n";
     }
+
+    cudaGraphExecDestroy(graphAExec);
+    cudaGraphExecDestroy(graphBExec);
+    cudaGraphDestroy(graphA);
+    cudaGraphDestroy(graphB);
+    cudaStreamDestroy(stream);
 
     cudaFree(dA);
     cudaFree(dAnew);
@@ -117,6 +158,6 @@ int main(int argc, char** argv){
     cudaFreeHost(hMaxErrHost);
     free(hA);
     free(hAnew);
-    
+
     return 0;
 }

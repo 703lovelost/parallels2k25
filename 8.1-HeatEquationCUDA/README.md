@@ -4,7 +4,7 @@ This code implements CUDA.
 
 ![](./matrix_10x10_heatmap.png)
 
-[**Click here to open the report.**](https://docs.google.com/document/d/1NvmNHmlJHrfucx5kziFX4y-4M0REZIcQFdnA6FpSgqc/edit?usp=sharing)
+[**Click here to open the report.**](https://docs.google.com/document/d/1fp2SYw84jkiYkZjmxGQbKXVaUe9OjxSdbL0HhUi8qMc/edit?usp=sharing)
 
 # Build
 
